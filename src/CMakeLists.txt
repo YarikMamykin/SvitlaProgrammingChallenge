@@ -1,5 +1,6 @@
 add_executable(${PROJECT_NAME}
 	${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/MockApiServer.cpp
 )
 target_compile_options(${PROJECT_NAME}
 	PUBLIC
@@ -13,11 +14,12 @@ target_compile_options(${PROJECT_NAME}
 )
 target_include_directories(${PROJECT_NAME}
 	PRIVATE
-	${Qt5Core_INCLUDE_DIRS}
+	${Qt6Core_INCLUDE_DIRS}
 )
 target_link_libraries(${PROJECT_NAME}
 	PRIVATE
-	Qt5::Core
+	Qt6::Core
+	Qt6::HttpServer
 )
 
 install(TARGETS ${PROJECT_NAME})
