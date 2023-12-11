@@ -1,0 +1,13 @@
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
+
+list(APPEND QT_COMPONENTS_REQUIRED Core Test)
+
+
+find_package(Qt6 COMPONENTS ${QT_COMPONENTS_REQUIRED})
+if (NOT Qt6_FOUND)
+    find_package(Qt5 REQUIRED COMPONENTS ${QT_COMPONENTS_REQUIRED})
+endif()
+
+include_directories(${QT_USE_FILE})
