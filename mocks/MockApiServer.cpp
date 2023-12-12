@@ -33,7 +33,7 @@ namespace {
 } // namespace
 
 namespace test::api {
-  MyRestApiServer::MyRestApiServer() {
+  MockApiServer::MockApiServer() {
     m_server.route(
         "/login/<arg>",
         QHttpServerRequest::Method::Get,

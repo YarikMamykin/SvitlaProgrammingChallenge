@@ -27,7 +27,6 @@ private:
     loop.exec();
 
     auto replyBytes = reply->readAll();
-    qDebug() << replyBytes;
     QJsonDocument replyData = QJsonDocument::fromJson(replyBytes);
     auto result = std::make_tuple(replyData, reply->error());
 
@@ -71,7 +70,7 @@ void TestLogin::loginTest() {
   QFETCH(QString, userrole);
   QFETCH(QString, expectedToken);
 
-  test::api::MyRestApiServer apiServer;
+  test::api::MockApiServer apiServer;
   auto [response, error] = makeRequest(
       QUrl(QString("http://localhost:8080/login/%1").arg(userrole)));
   QCOMPARE(error, QNetworkReply::NetworkError::NoError);

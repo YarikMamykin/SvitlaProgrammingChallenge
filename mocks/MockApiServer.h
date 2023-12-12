@@ -6,11 +6,11 @@
 #include <QJsonObject>
 
 namespace test::api {
-  class MyRestApiServer {
+  class MockApiServer {
 
   public:
-    MyRestApiServer();
-    ~MyRestApiServer() = default;
+    MockApiServer();
+    ~MockApiServer() = default;
 
   private:
     QHttpServer m_server;
