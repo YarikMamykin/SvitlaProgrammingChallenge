@@ -5,13 +5,50 @@
 #include <QHostAddress>
 #include <QHttpServerRequest>
 #include <QHttpServerResponse>
+#include <QJsonObject>
+#include <stdexcept>
+#include <unordered_map>
+
+namespace {
+  /*
+   * Predefined map of user ids to their hardcoded JWT token.
+   * Enough for test purpose to imitate logged in user.
+   */
+  static const std::unordered_map<QString, QString> users = {
+    {"superuser",
+     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+     "eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIy"
+     "fQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"},
+
+    {    "admin",
+     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+     "fyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIy"
+     "fQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"},
+
+    {     "user",
+     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+     "gyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIy"
+     "fQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"},
+  };
+} // namespace
 
 namespace test::api {
   MyRestApiServer::MyRestApiServer() {
-    m_server.route("/exit", []() -> QHttpServerResponse {
-      QCoreApplication::exit(0);
-      return "";
-    });
+    m_server.route(
+        "/login/<arg>",
+        QHttpServerRequest::Method::Get,
+        [](const QString& id) -> QHttpServerResponse {
+          try {
+
+            const auto& userToken = users.at(id);
+            QJsonObject responseBody;
+            responseBody["jwtToken"] = userToken;
+            return responseBody;
+
+          } catch (const std::out_of_range& idError) {
+            return QHttpServerResponse::StatusCode::InternalServerError;
+          }
+        });
 
     m_server.route(
         "/cable/type",
