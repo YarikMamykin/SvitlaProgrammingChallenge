@@ -9,7 +9,21 @@ namespace test::api {
   class MockApiServer {
 
   public:
-    MockApiServer();
+    enum class State {
+      Normal,
+      Unauthorized,
+      AttemptToAccessAnotherCustomerData,
+      NonExistingCustomerId,
+      CableTypeAlreadyExists,
+      BusinessRulesViolated,
+      DatabaseRejectedTransaction,
+      DatabaseUnhandledError,
+      DatabaseRequestTimeout,
+      DatabaseConnectionError,
+      TooLargePayload
+    };
+
+    MockApiServer(State state = State::Normal);
     ~MockApiServer() = default;
 
   private:
