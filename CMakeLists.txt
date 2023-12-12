@@ -13,5 +13,7 @@ project(SvitlaProgrammingChallenge VERSION 0.1.0 LANGUAGES CXX)
 
 include(${CMAKE_SOURCE_DIR}/dependencies/qt.cmake)
 
-add_subdirectory(src)
+add_subdirectory(mocks)
 add_subdirectory(tests)
+
+install(FILES ${CMAKE_BINARY_DIR}/compile_commands.json DESTINATION ${CMAKE_SOURCE_DIR})

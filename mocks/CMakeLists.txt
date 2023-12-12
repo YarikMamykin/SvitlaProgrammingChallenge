@@ -1,0 +1,21 @@
+add_library(MockApiServer
+	OBJECT
+	${CMAKE_CURRENT_SOURCE_DIR}/MockApiServer.cpp
+)
+target_compile_options(MockApiServer
+	PUBLIC
+	-fPIC 
+	-Wall 
+	-Werror
+	-Wextra
+	-Wpedantic
+)
+target_include_directories(MockApiServer
+	PUBLIC
+	${Qt6Core_INCLUDE_DIRS}
+)
+target_link_libraries(MockApiServer
+	PUBLIC
+	Qt6::Core
+	Qt6::HttpServer
+)
