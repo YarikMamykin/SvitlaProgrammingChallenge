@@ -20,7 +20,8 @@ namespace test::api {
       DatabaseUnhandledError,
       DatabaseRequestTimeout,
       DatabaseConnectionError,
-      TooLargePayload
+      TooLargePayload,
+      CableTypeReferencedByOtherEntities
     };
 
     MockApiServer(State state = State::Normal);
