@@ -33,82 +33,78 @@ namespace {
      "fQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"},
   };
 
+  QHttpServerResponse makeResponse(QString&& rawBody,
+                                   QHttpServerResponse::StatusCode statusCode) {
+    return QHttpServerResponse(
+        QJsonDocument::fromJson(rawBody.toUtf8()).object(), statusCode);
+  }
+
   using State = test::api::MockApiServer::State;
   QHttpServerResponse responseByState(State state) {
 
     switch (state) {
 
     case State::Unauthorized:
-      return QHttpServerResponse(
-          QJsonDocument::fromJson(R"({"cause": "Unauthorized"})").object(),
-          QHttpServerResponse::StatusCode::Unauthorized);
+      return makeResponse(R"({"cause": "Unauthorized"})",
+                          QHttpServerResponse::StatusCode::Unauthorized);
 
     case State::AttemptToAccessAnotherCustomerData:
-      return QHttpServerResponse(
-          QJsonDocument::fromJson(
-              R"({"cause": "Attempt to access another customer data"})")
-              .object(),
+      return makeResponse(
+          R"({"cause": "Attempt to access another customer data"})",
           QHttpServerResponse::StatusCode::Forbidden);
 
     case State::NonExistingCustomerId:
-      return QHttpServerResponse(
-          QJsonDocument::fromJson(
-              R"({"cause": "Non existing customer id specified"})")
-              .object(),
-          QHttpServerResponse::StatusCode::NotFound);
+      return makeResponse(R"({"cause": "Non existing customer id specified"})",
+                          QHttpServerResponse::StatusCode::NotFound);
 
     case State::CableTypeAlreadyExists:
-      return QHttpServerResponse(
-          QJsonDocument::fromJson(R"({"cause": "Cable type already exists"})")
-              .object(),
-          QHttpServerResponse::StatusCode::Conflict);
+      return makeResponse(R"({"cause": "Cable type already exists"})",
+                          QHttpServerResponse::StatusCode::Conflict);
 
     case State::BusinessRulesViolated:
-      return QHttpServerResponse(
-          QJsonDocument::fromJson(R"({"cause": "Business rules violated"})")
-              .object(),
-          QHttpServerResponse::StatusCode::PreconditionFailed);
+      return makeResponse(R"({"cause": "Business rules violated"})",
+                          QHttpServerResponse::StatusCode::PreconditionFailed);
 
     case State::DatabaseRejectedTransaction:
-      return QHttpServerResponse(
-          QJsonDocument::fromJson(
-              R"({"cause": "Database rejected transaction"})")
-              .object(),
-          QHttpServerResponse::StatusCode::ExpectationFailed);
+      return makeResponse(R"({"cause": "Database rejected transaction"})",
+                          QHttpServerResponse::StatusCode::ExpectationFailed);
 
     case State::DatabaseUnhandledError:
-      return QHttpServerResponse(
-          QJsonDocument::fromJson(R"({"cause": "Database unhandled error"})")
-              .object(),
-          QHttpServerResponse::StatusCode::UnprocessableEntity);
+      return makeResponse(R"({"cause": "Database unhandled error"})",
+                          QHttpServerResponse::StatusCode::UnprocessableEntity);
 
     case State::DatabaseRequestTimeout:
-      return QHttpServerResponse(
-          QJsonDocument::fromJson(R"({"cause": "Database request timeout"})")
-              .object(),
-          QHttpServerResponse::StatusCode::FailedDependency);
+      return makeResponse(R"({"cause": "Database request timeout"})",
+                          QHttpServerResponse::StatusCode::FailedDependency);
 
     case State::DatabaseConnectionError:
-      return QHttpServerResponse(
-          QJsonDocument::fromJson(R"({"cause": "Database connection error"})")
-              .object(),
-          QHttpServerResponse::StatusCode::InternalServerError);
+      return makeResponse(R"({"cause": "Database connection error"})",
+                          QHttpServerResponse::StatusCode::InternalServerError);
 
     case State::TooLargePayload:
-      return QHttpServerResponse(
-          QJsonDocument::fromJson(R"({"cause": "Too large payload"})").object(),
-          QHttpServerResponse::StatusCode::InsufficientStorage);
+      return makeResponse(R"({"cause": "Too large payload"})",
+                          QHttpServerResponse::StatusCode::InsufficientStorage);
 
     default:
       break;
     }
 
-    return QHttpServerResponse(
-        QJsonDocument::fromJson(R"({"cause": "Unexpected error"})").object(),
-        QHttpServerResponse::StatusCode::BadGateway);
+    return makeResponse(R"({"cause": "Unexpected error"})",
+                        QHttpServerResponse::StatusCode::BadGateway);
   };
 
-  static constexpr std::array rotationFrequencyUnitValues = { "d", "w", "m" };
+  bool validateRotationFrequencyUnitValues(QString&& value) noexcept {
+    static constexpr std::array<std::string, 3> rotationFrequencyUnitValues = {
+      "d", "w", "m"
+    };
+
+    return std::none_of(
+        rotationFrequencyUnitValues.begin(),
+        rotationFrequencyUnitValues.end(),
+        [valueToValidate = value.toStdString()](const auto& value) -> bool {
+          return value == valueToValidate;
+        });
+  }
 
   QString
   extractUserTokenFromHeaders(QList<QPair<QByteArray, QByteArray>>&& headers) {
@@ -240,45 +236,32 @@ namespace test::api {
               QJsonDocument::fromJson(request.body()).object();
 
           if (requestBody.contains("id")) {
-            return QHttpServerResponse(
-                QJsonDocument::fromJson(
-                    R"({"cause": "id provided in request"})")
-                    .object(),
-                QHttpServerResponse::StatusCode::BadRequest);
+            return makeResponse(R"({"cause": "id provided in request"})",
+                                QHttpServerResponse::StatusCode::BadRequest);
           }
 
           if (not requestBody.contains("catid") or
               not requestBody.contains("identifier")) {
-            return QHttpServerResponse(
-                QJsonDocument::fromJson(R"({"cause": "missing required keys"})")
-                    .object(),
-                QHttpServerResponse::StatusCode::BadRequest);
+            return makeResponse(R"({"cause": "missing required keys"})",
+                                QHttpServerResponse::StatusCode::BadRequest);
           }
 
           if (requestBody.contains("rotationFrequency") and
               (not requestBody["rotationFrequency"].isObject() or
                not requestBody["rotationFrequency"].toObject().contains(
                    "unit"))) {
-            return QHttpServerResponse(
-                QJsonDocument::fromJson(
-                    R"({"cause": "rotationFrequency invalid specification"})")
-                    .object(),
+            return makeResponse(
+                R"({"cause": "rotationFrequency invalid specification"})",
                 QHttpServerResponse::StatusCode::BadRequest);
           }
 
           if (requestBody.contains("rotationFrequency") and
-              std::none_of(rotationFrequencyUnitValues.begin(),
-                           rotationFrequencyUnitValues.end(),
-                           [&requestBody](const auto& value) -> bool {
-                             return value == requestBody["rotationFrequency"]
-                                                 .toObject()["unit"]
-                                                 .toString()
-                                                 .toStdString();
-                           })) {
-            return QHttpServerResponse(
-                QJsonDocument::fromJson(
-                    R"({"cause": "rotationFrequency.unit has invalid value"})")
-                    .object(),
+              validateRotationFrequencyUnitValues(
+                  requestBody["rotationFrequency"]
+                      .toObject()["unit"]
+                      .toString())) {
+            return makeResponse(
+                R"({"cause": "rotationFrequency.unit has invalid value"})",
                 QHttpServerResponse::StatusCode::BadRequest);
           }
 
@@ -321,30 +304,20 @@ namespace test::api {
           auto idSize = id.size();
           auto correctIdSize = response["id"].toString().size();
           if (idSize < correctIdSize or idSize > correctIdSize) {
-            return QHttpServerResponse(
-                QJsonDocument::fromJson(
-                    R"({"cause": "Cable type id has invalid format"})")
-                    .object(),
+            return makeResponse(
+                R"({"cause": "Cable type id has invalid format"})",
                 QHttpServerResponse::StatusCode::BadRequest);
           }
 
           if (id != response["id"].toString()) {
-            return QHttpServerResponse(
-                QJsonDocument::fromJson(
-                    R"({"cause": "Cable type doesn't exists by specified id"})")
-                    .object(),
+            return makeResponse(
+                R"({"cause": "Cable type doesn't exists by specified id"})",
                 QHttpServerResponse::StatusCode::NotFound);
           }
 
           return response;
         });
 
-    m_server.route("/cable/type/id/<arg>",
-                   QHttpServerRequest::Method::Get,
-                   [](const QString& id) -> QHttpServerResponse {
-                     qDebug() << id;
-                     return "KEK";
-                   });
     m_server.route(
         "/cable/type/id/<arg>",
         QHttpServerRequest::Method::Delete,
@@ -357,10 +330,8 @@ namespace test::api {
           }
 
           if (State::CableTypeReferencedByOtherEntities == state) {
-            return QHttpServerResponse(
-                QJsonDocument::fromJson(
-                    R"({"cause": "Cable type is referenced by other entities"})")
-                    .object(),
+            return makeResponse(
+                R"({"cause": "Cable type is referenced by other entities"})",
                 QHttpServerResponse::StatusCode::PreconditionFailed);
           }
 
@@ -374,18 +345,14 @@ namespace test::api {
           auto idSize = id.size();
           auto correctIdSize = response["id"].toString().size();
           if (idSize < correctIdSize or idSize > correctIdSize) {
-            return QHttpServerResponse(
-                QJsonDocument::fromJson(
-                    R"({"cause": "Cable type id has invalid format"})")
-                    .object(),
+            return makeResponse(
+                R"({"cause": "Cable type id has invalid format"})",
                 QHttpServerResponse::StatusCode::BadRequest);
           }
 
           if (id != response["id"].toString()) {
-            return QHttpServerResponse(
-                QJsonDocument::fromJson(
-                    R"({"cause": "Cable type doesn't exists by specified id"})")
-                    .object(),
+            return makeResponse(
+                R"({"cause": "Cable type doesn't exists by specified id"})",
                 QHttpServerResponse::StatusCode::NotFound);
           }
 
@@ -410,27 +377,20 @@ namespace test::api {
               QJsonDocument::fromJson(request.body()).object();
 
           if (not requestBody.contains("id")) {
-            return QHttpServerResponse(
-                QJsonDocument::fromJson(
-                    R"({"cause": "id not provided in request"})")
-                    .object(),
-                QHttpServerResponse::StatusCode::BadRequest);
+            return makeResponse(R"({"cause": "id not provided in request"})",
+                                QHttpServerResponse::StatusCode::BadRequest);
           }
 
           if (id != requestBody["id"].toString()) {
-            return QHttpServerResponse(
-                QJsonDocument::fromJson(
-                    R"({"cause": "id mismatch for URL and request body"})")
-                    .object(),
+            return makeResponse(
+                R"({"cause": "id mismatch for URL and request body"})",
                 QHttpServerResponse::StatusCode::BadRequest);
           }
 
           if (not requestBody.contains("catid") or
               not requestBody.contains("identifier")) {
-            return QHttpServerResponse(
-                QJsonDocument::fromJson(R"({"cause": "missing required keys"})")
-                    .object(),
-                QHttpServerResponse::StatusCode::BadRequest);
+            return makeResponse(R"({"cause": "missing required keys"})",
+                                QHttpServerResponse::StatusCode::BadRequest);
           }
 
           QJsonObject defaultCableType =
@@ -439,10 +399,8 @@ namespace test::api {
           if (defaultCableType["id"] != requestBody["id"] or
               defaultCableType["catid"] != requestBody["catid"] or
               defaultCableType["identifier"] != requestBody["identifier"]) {
-            return QHttpServerResponse(
-                QJsonDocument::fromJson(
-                    R"({"cause": "Attempt to change immutable keys"})")
-                    .object(),
+            return makeResponse(
+                R"({"cause": "Attempt to change immutable keys"})",
                 QHttpServerResponse::StatusCode::PreconditionFailed);
           }
 
@@ -450,26 +408,18 @@ namespace test::api {
               (not requestBody["rotationFrequency"].isObject() or
                not requestBody["rotationFrequency"].toObject().contains(
                    "unit"))) {
-            return QHttpServerResponse(
-                QJsonDocument::fromJson(
-                    R"({"cause": "rotationFrequency invalid specification"})")
-                    .object(),
+            return makeResponse(
+                R"({"cause": "rotationFrequency invalid specification"})",
                 QHttpServerResponse::StatusCode::BadRequest);
           }
 
           if (requestBody.contains("rotationFrequency") and
-              std::none_of(rotationFrequencyUnitValues.begin(),
-                           rotationFrequencyUnitValues.end(),
-                           [&requestBody](const auto& value) -> bool {
-                             return value == requestBody["rotationFrequency"]
-                                                 .toObject()["unit"]
-                                                 .toString()
-                                                 .toStdString();
-                           })) {
-            return QHttpServerResponse(
-                QJsonDocument::fromJson(
-                    R"({"cause": "rotationFrequency.unit has invalid value"})")
-                    .object(),
+              validateRotationFrequencyUnitValues(
+                  requestBody["rotationFrequency"]
+                      .toObject()["unit"]
+                      .toString())) {
+            return makeResponse(
+                R"({"cause": "rotationFrequency.unit has invalid value"})",
                 QHttpServerResponse::StatusCode::BadRequest);
           }
 
