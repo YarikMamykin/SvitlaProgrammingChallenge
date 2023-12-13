@@ -511,38 +511,40 @@ namespace test::api {
           return defaultCableType;
         });
 
-    m_server.route("/cable/type/count/references/<arg>",
-                   QHttpServerRequest::Method::Get,
-                   [](const QString& ref) -> QHttpServerResponse {
-                     qDebug() << ref;
-                     return "KEK";
-                   });
-    m_server.route("/cable/type/history/summary/<arg>",
-                   QHttpServerRequest::Method::Get,
-                   [](const QString& id) -> QHttpServerResponse {
-                     qDebug() << id;
-                     return "KEK";
-                   });
-    m_server.route("/cable/type/history/document/<arg>",
-                   QHttpServerRequest::Method::Get,
-                   [](const QString& id) -> QHttpServerResponse {
-                     qDebug() << id;
-                     return "KEK";
-                   });
-    m_server.route("/cable/type/created/between/<arg>/<arg>",
-                   QHttpServerRequest::Method::Get,
-                   [](const QString& startTime,
-                      const QString& endTime) -> QHttpServerResponse {
-                     qDebug() << startTime << " " << endTime;
-                     return "KEK";
-                   });
-    m_server.route("/cable/type/modified/between/<arg>/<arg>",
-                   QHttpServerRequest::Method::Get,
-                   [](const QString& startTime,
-                      const QString& endTime) -> QHttpServerResponse {
-                     qDebug() << startTime << " " << endTime;
-                     return "KEK";
-                   });
+    m_server.route(
+        "/cable/type/catid/<arg>/customer/code/<arg>",
+        QHttpServerRequest::Method::Get,
+        [state](int catid,
+                const QString& code,
+                const QHttpServerRequest& request) -> QHttpServerResponse {
+          auto token = extractUserTokenFromHeaders(request.headers());
+          if (token.isEmpty() or token != users.at("superuser")) {
+            return responseByState(State::Unauthorized);
+          }
+
+          if (State::Normal != state) {
+            return responseByState(state);
+          }
+
+          QJsonObject defaultCableType =
+              QJsonDocument::fromJson(defaultCableTypeData).object();
+
+          if (catid != defaultCableType["catid"].toInt()) {
+            return makeResponse(
+                R"({"cause": "Cable type not found by identifier"})",
+                QHttpServerResponse::StatusCode::NotFound);
+          }
+
+          if (code !=
+              defaultCableType["customer"].toObject()["code"].toString()) {
+            return makeResponse(
+                R"({"cause": "Cable type not found by customer code"})",
+                QHttpServerResponse::StatusCode::NotFound);
+          }
+
+          return defaultCableType;
+        });
+
     m_server.listen(QHostAddress::LocalHost, 8080);
   }
 
