@@ -3,61 +3,10 @@
 #include <QJsonObject>
 #include <QObject>
 #include <QTest>
+#include <utils.h>
 
 class GetCableType : public QObject {
   Q_OBJECT
-
-private:
-  std::tuple<QJsonObject, int, QNetworkReply::NetworkError>
-  makeGetRequest(const QNetworkRequest& request) {
-
-    QNetworkAccessManager manager;
-
-    QNetworkReply* reply = manager.get(request);
-
-    // Set up a QEventLoop to wait for the reply finished signal
-    QEventLoop loop;
-    connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-
-    loop.exec();
-
-    auto replyBytes = reply->readAll();
-    QJsonDocument replyData = QJsonDocument::fromJson(replyBytes);
-    auto result = std::make_tuple(
-        replyData.object(),
-        reply->attribute(QNetworkRequest::Attribute::HttpStatusCodeAttribute)
-            .toInt(),
-        reply->error());
-
-    // Clean up
-    reply->deleteLater();
-
-    return result;
-  }
-
-  QString loginUser(const QString& userRole) {
-    QNetworkAccessManager manager;
-
-    QNetworkRequest request(
-        QUrl(QString("http://localhost:8080/login/%1").arg(userRole)));
-    request.setHeader(QNetworkRequest::ContentTypeHeader,
-                      QString("application/json"));
-    QNetworkReply* reply = manager.get(request);
-
-    // Set up a QEventLoop to wait for the reply finished signal
-    QEventLoop loop;
-    connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-
-    loop.exec();
-
-    auto replyBytes = reply->readAll();
-    QJsonDocument response = QJsonDocument::fromJson(replyBytes);
-    auto token = response.object()["jwtToken"].toString();
-
-    // Clean up
-    reply->deleteLater();
-    return token;
-  }
 
 private slots:
   void getCableTypeByIdTest_data();
@@ -76,84 +25,8 @@ private slots:
   void getCableTypeByCatIdAndCustomerCodeTest();
 };
 
-void GetCableType::getCableTypeByIdTest_data() {
-  auto requestBodyRaw = QString(R"(
-    {
-      "identifier": "10-al-1c-trxple",
-      "catid": 1622475,
-      "diameter": {
-        "published": {
-          "value": 22.43,
-          "unit": "mAh"
-        },
-        "actual": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "conductor": {
-        "number": 0,
-        "size": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "insulation": {
-        "type": "string",
-        "shield": "string",
-        "jacket": "string",
-        "thickness": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "material": {
-        "aluminum": 0,
-        "copper": 0,
-        "weight": {
-          "net": {
-            "value": 22.43,
-            "unit": "mAh"
-          },
-          "calculated": {
-            "value": 22.43,
-            "unit": "mAh"
-          }
-        }
-      },
-      "currentPrice": {
-        "value": 22.43,
-        "unit": "USD"
-      },
-      "voltage": {
-        "value": 22.43,
-        "unit": "mAh"
-      },
-      "rotationFrequency": {
-        "value": 22.43,
-        "unit": "m"
-      },
-      "manufacturer": {
-        "id": "5f3bc9e2502422053e08f9f1",
-        "name": "Kerite"
-      },
-      "properties": [
-        {
-          "name": "manufacturedBy",
-          "value": {
-            "string": "string value",
-            "number": 1234.56
-          }
-        }
-      ],
-      "customer": {
-        "id": "5f3bc9e2502422053e08f9f1",
-        "code": "bge"
-      },
-      "metadata": { }
-    })");
-
-  auto responseBodyRaw = QString(R"(
+namespace {
+  static constexpr char responseBodyRaw[] = R"(
     {
       "id": "5f3bc9e2502422053e08f9f1",
       "identifier": "10-al-1c-trxple",
@@ -235,8 +108,11 @@ void GetCableType::getCableTypeByIdTest_data() {
           "username": "test@reelsense.io" 
         } 
       }
-    })");
+    })";
 
+} // namespace
+
+void GetCableType::getCableTypeByIdTest_data() {
   QTest::addColumn<QString>("userRole");
   QTest::addColumn<QString>("testId");
   QTest::addColumn<QJsonObject>("expectedResponseBody");
@@ -245,8 +121,7 @@ void GetCableType::getCableTypeByIdTest_data() {
   QTest::addColumn<test::api::MockApiServer::State>("apiState");
 
   QString testId{ "5f3bc9e2502422053e08f9f1" };
-  auto validResponseBody =
-      QJsonDocument::fromJson(responseBodyRaw.toUtf8()).object();
+  auto validResponseBody = QJsonDocument::fromJson(responseBodyRaw).object();
 
   QTest::newRow("Superuser valid request body 200")
       << "superuser" << testId << validResponseBody << 200
@@ -343,7 +218,7 @@ void GetCableType::getCableTypeByIdTest() {
   QFETCH(test::api::MockApiServer::State, apiState);
 
   test::api::MockApiServer apiServer{ apiState };
-  auto token = loginUser(userRole);
+  auto token = test::utils::loginUser(userRole);
 
   if (not userRole.isEmpty()) {
     QCOMPARE(155ul, token.size());
@@ -356,7 +231,8 @@ void GetCableType::getCableTypeByIdTest() {
   }
   request.setHeader(QNetworkRequest::ContentTypeHeader,
                     QString("application/json"));
-  auto [responseObject, returnCode, networkError] = makeGetRequest(request);
+  auto [responseObject, returnCode, networkError] =
+      test::utils::makeGetRequest(request);
 
   QCOMPARE(responseObject, expectedResponseBody);
   QCOMPARE(returnCode, expectedResultCode);
@@ -364,166 +240,6 @@ void GetCableType::getCableTypeByIdTest() {
 }
 
 void GetCableType::getCableTypeByIdentifierTest_data() {
-  auto requestBodyRaw = QString(R"(
-    {
-      "identifier": "10-al-1c-trxple",
-      "catid": 1622475,
-      "diameter": {
-        "published": {
-          "value": 22.43,
-          "unit": "mAh"
-        },
-        "actual": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "conductor": {
-        "number": 0,
-        "size": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "insulation": {
-        "type": "string",
-        "shield": "string",
-        "jacket": "string",
-        "thickness": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "material": {
-        "aluminum": 0,
-        "copper": 0,
-        "weight": {
-          "net": {
-            "value": 22.43,
-            "unit": "mAh"
-          },
-          "calculated": {
-            "value": 22.43,
-            "unit": "mAh"
-          }
-        }
-      },
-      "currentPrice": {
-        "value": 22.43,
-        "unit": "USD"
-      },
-      "voltage": {
-        "value": 22.43,
-        "unit": "mAh"
-      },
-      "rotationFrequency": {
-        "value": 22.43,
-        "unit": "m"
-      },
-      "manufacturer": {
-        "id": "5f3bc9e2502422053e08f9f1",
-        "name": "Kerite"
-      },
-      "properties": [
-        {
-          "name": "manufacturedBy",
-          "value": {
-            "string": "string value",
-            "number": 1234.56
-          }
-        }
-      ],
-      "customer": {
-        "id": "5f3bc9e2502422053e08f9f1",
-        "code": "bge"
-      },
-      "metadata": { }
-    })");
-
-  auto responseBodyRaw = QString(R"(
-    {
-      "id": "5f3bc9e2502422053e08f9f1",
-      "identifier": "10-al-1c-trxple",
-      "catid": 1622475,
-      "diameter": {
-        "published": {
-          "value": 22.43,
-          "unit": "mAh"
-        },
-        "actual": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "conductor": {
-        "number": 0,
-        "size": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "insulation": {
-        "type": "string",
-        "shield": "string",
-        "jacket": "string",
-        "thickness": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "material": {
-        "aluminum": 0,
-        "copper": 0,
-        "weight": {
-          "net": {
-            "value": 22.43,
-            "unit": "mAh"
-          },
-          "calculated": {
-            "value": 22.43,
-            "unit": "mAh"
-          }
-        }
-      },
-      "currentPrice": {
-        "value": 22.43,
-        "unit": "USD"
-      },
-      "voltage": {
-        "value": 22.43,
-        "unit": "mAh"
-      },
-      "rotationFrequency": {
-        "value": 22.43,
-        "unit": "m"
-      },
-      "manufacturer": {
-        "id": "5f3bc9e2502422053e08f9f1",
-        "name": "Kerite"
-      },
-      "properties": [
-        {
-          "name": "manufacturedBy",
-          "value": {
-            "string": "string value",
-            "number": 1234.56
-          }
-        }
-      ],
-      "customer": {
-        "id": "5f3bc9e2502422053e08f9f1",
-        "code": "bge"
-      },
-      "metadata": {
-        "created": "2020-10-13T21:31:51.259Z", 
-        "modified": "2020-10-13T21:31:51.259Z", 
-        "user": { 
-          "id": "5f3bc9e2502422053e08f9f1", 
-          "username": "test@reelsense.io" 
-        } 
-      }
-    })");
-
   QTest::addColumn<QString>("userRole");
   QTest::addColumn<QString>("testIdentifier");
   QTest::addColumn<QJsonObject>("expectedResponseBody");
@@ -532,8 +248,7 @@ void GetCableType::getCableTypeByIdentifierTest_data() {
   QTest::addColumn<test::api::MockApiServer::State>("apiState");
 
   QString testId{ "10-al-1c-trxple" };
-  auto validResponseBody =
-      QJsonDocument::fromJson(responseBodyRaw.toUtf8()).object();
+  auto validResponseBody = QJsonDocument::fromJson(responseBodyRaw).object();
 
   QTest::newRow("Superuser valid request body 200")
       << "superuser" << testId << validResponseBody << 200
@@ -604,7 +319,7 @@ void GetCableType::getCableTypeByIdentifierTest() {
   QFETCH(test::api::MockApiServer::State, apiState);
 
   test::api::MockApiServer apiServer{ apiState };
-  auto token = loginUser(userRole);
+  auto token = test::utils::loginUser(userRole);
 
   if (not userRole.isEmpty()) {
     QCOMPARE(155ul, token.size());
@@ -618,7 +333,8 @@ void GetCableType::getCableTypeByIdentifierTest() {
   }
   request.setHeader(QNetworkRequest::ContentTypeHeader,
                     QString("application/json"));
-  auto [responseObject, returnCode, networkError] = makeGetRequest(request);
+  auto [responseObject, returnCode, networkError] =
+      test::utils::makeGetRequest(request);
 
   QCOMPARE(responseObject, expectedResponseBody);
   QCOMPARE(returnCode, expectedResultCode);
@@ -626,166 +342,6 @@ void GetCableType::getCableTypeByIdentifierTest() {
 }
 
 void GetCableType::getCableTypeByCatIdTest_data() {
-  auto requestBodyRaw = QString(R"(
-    {
-      "identifier": "10-al-1c-trxple",
-      "catid": 1622475,
-      "diameter": {
-        "published": {
-          "value": 22.43,
-          "unit": "mAh"
-        },
-        "actual": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "conductor": {
-        "number": 0,
-        "size": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "insulation": {
-        "type": "string",
-        "shield": "string",
-        "jacket": "string",
-        "thickness": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "material": {
-        "aluminum": 0,
-        "copper": 0,
-        "weight": {
-          "net": {
-            "value": 22.43,
-            "unit": "mAh"
-          },
-          "calculated": {
-            "value": 22.43,
-            "unit": "mAh"
-          }
-        }
-      },
-      "currentPrice": {
-        "value": 22.43,
-        "unit": "USD"
-      },
-      "voltage": {
-        "value": 22.43,
-        "unit": "mAh"
-      },
-      "rotationFrequency": {
-        "value": 22.43,
-        "unit": "m"
-      },
-      "manufacturer": {
-        "id": "5f3bc9e2502422053e08f9f1",
-        "name": "Kerite"
-      },
-      "properties": [
-        {
-          "name": "manufacturedBy",
-          "value": {
-            "string": "string value",
-            "number": 1234.56
-          }
-        }
-      ],
-      "customer": {
-        "id": "5f3bc9e2502422053e08f9f1",
-        "code": "bge"
-      },
-      "metadata": { }
-    })");
-
-  auto responseBodyRaw = QString(R"(
-    {
-      "id": "5f3bc9e2502422053e08f9f1",
-      "identifier": "10-al-1c-trxple",
-      "catid": 1622475,
-      "diameter": {
-        "published": {
-          "value": 22.43,
-          "unit": "mAh"
-        },
-        "actual": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "conductor": {
-        "number": 0,
-        "size": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "insulation": {
-        "type": "string",
-        "shield": "string",
-        "jacket": "string",
-        "thickness": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "material": {
-        "aluminum": 0,
-        "copper": 0,
-        "weight": {
-          "net": {
-            "value": 22.43,
-            "unit": "mAh"
-          },
-          "calculated": {
-            "value": 22.43,
-            "unit": "mAh"
-          }
-        }
-      },
-      "currentPrice": {
-        "value": 22.43,
-        "unit": "USD"
-      },
-      "voltage": {
-        "value": 22.43,
-        "unit": "mAh"
-      },
-      "rotationFrequency": {
-        "value": 22.43,
-        "unit": "m"
-      },
-      "manufacturer": {
-        "id": "5f3bc9e2502422053e08f9f1",
-        "name": "Kerite"
-      },
-      "properties": [
-        {
-          "name": "manufacturedBy",
-          "value": {
-            "string": "string value",
-            "number": 1234.56
-          }
-        }
-      ],
-      "customer": {
-        "id": "5f3bc9e2502422053e08f9f1",
-        "code": "bge"
-      },
-      "metadata": {
-        "created": "2020-10-13T21:31:51.259Z", 
-        "modified": "2020-10-13T21:31:51.259Z", 
-        "user": { 
-          "id": "5f3bc9e2502422053e08f9f1", 
-          "username": "test@reelsense.io" 
-        } 
-      }
-    })");
-
   QTest::addColumn<QString>("userRole");
   QTest::addColumn<int>("catid");
   QTest::addColumn<QJsonObject>("expectedResponseBody");
@@ -794,8 +350,7 @@ void GetCableType::getCableTypeByCatIdTest_data() {
   QTest::addColumn<test::api::MockApiServer::State>("apiState");
 
   const int catid{ 1622475 };
-  auto validResponseBody =
-      QJsonDocument::fromJson(responseBodyRaw.toUtf8()).object();
+  auto validResponseBody = QJsonDocument::fromJson(responseBodyRaw).object();
 
   QTest::newRow("Superuser valid request body 200")
       << "superuser" << catid << validResponseBody << 200
@@ -866,7 +421,7 @@ void GetCableType::getCableTypeByCatIdTest() {
   QFETCH(test::api::MockApiServer::State, apiState);
 
   test::api::MockApiServer apiServer{ apiState };
-  auto token = loginUser(userRole);
+  auto token = test::utils::loginUser(userRole);
 
   if (not userRole.isEmpty()) {
     QCOMPARE(155ul, token.size());
@@ -879,7 +434,8 @@ void GetCableType::getCableTypeByCatIdTest() {
   }
   request.setHeader(QNetworkRequest::ContentTypeHeader,
                     QString("application/json"));
-  auto [responseObject, returnCode, networkError] = makeGetRequest(request);
+  auto [responseObject, returnCode, networkError] =
+      test::utils::makeGetRequest(request);
 
   QCOMPARE(responseObject, expectedResponseBody);
   QCOMPARE(returnCode, expectedResultCode);
@@ -887,166 +443,6 @@ void GetCableType::getCableTypeByCatIdTest() {
 }
 
 void GetCableType::getCableTypeByIdentifierAndCustomerCodeTest_data() {
-  auto requestBodyRaw = QString(R"(
-    {
-      "identifier": "10-al-1c-trxple",
-      "catid": 1622475,
-      "diameter": {
-        "published": {
-          "value": 22.43,
-          "unit": "mAh"
-        },
-        "actual": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "conductor": {
-        "number": 0,
-        "size": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "insulation": {
-        "type": "string",
-        "shield": "string",
-        "jacket": "string",
-        "thickness": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "material": {
-        "aluminum": 0,
-        "copper": 0,
-        "weight": {
-          "net": {
-            "value": 22.43,
-            "unit": "mAh"
-          },
-          "calculated": {
-            "value": 22.43,
-            "unit": "mAh"
-          }
-        }
-      },
-      "currentPrice": {
-        "value": 22.43,
-        "unit": "USD"
-      },
-      "voltage": {
-        "value": 22.43,
-        "unit": "mAh"
-      },
-      "rotationFrequency": {
-        "value": 22.43,
-        "unit": "m"
-      },
-      "manufacturer": {
-        "id": "5f3bc9e2502422053e08f9f1",
-        "name": "Kerite"
-      },
-      "properties": [
-        {
-          "name": "manufacturedBy",
-          "value": {
-            "string": "string value",
-            "number": 1234.56
-          }
-        }
-      ],
-      "customer": {
-        "id": "5f3bc9e2502422053e08f9f1",
-        "code": "bge"
-      },
-      "metadata": { }
-    })");
-
-  auto responseBodyRaw = QString(R"(
-    {
-      "id": "5f3bc9e2502422053e08f9f1",
-      "identifier": "10-al-1c-trxple",
-      "catid": 1622475,
-      "diameter": {
-        "published": {
-          "value": 22.43,
-          "unit": "mAh"
-        },
-        "actual": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "conductor": {
-        "number": 0,
-        "size": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "insulation": {
-        "type": "string",
-        "shield": "string",
-        "jacket": "string",
-        "thickness": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "material": {
-        "aluminum": 0,
-        "copper": 0,
-        "weight": {
-          "net": {
-            "value": 22.43,
-            "unit": "mAh"
-          },
-          "calculated": {
-            "value": 22.43,
-            "unit": "mAh"
-          }
-        }
-      },
-      "currentPrice": {
-        "value": 22.43,
-        "unit": "USD"
-      },
-      "voltage": {
-        "value": 22.43,
-        "unit": "mAh"
-      },
-      "rotationFrequency": {
-        "value": 22.43,
-        "unit": "m"
-      },
-      "manufacturer": {
-        "id": "5f3bc9e2502422053e08f9f1",
-        "name": "Kerite"
-      },
-      "properties": [
-        {
-          "name": "manufacturedBy",
-          "value": {
-            "string": "string value",
-            "number": 1234.56
-          }
-        }
-      ],
-      "customer": {
-        "id": "5f3bc9e2502422053e08f9f1",
-        "code": "bge"
-      },
-      "metadata": {
-        "created": "2020-10-13T21:31:51.259Z", 
-        "modified": "2020-10-13T21:31:51.259Z", 
-        "user": { 
-          "id": "5f3bc9e2502422053e08f9f1", 
-          "username": "test@reelsense.io" 
-        } 
-      }
-    })");
-
   QTest::addColumn<QString>("userRole");
   QTest::addColumn<QString>("testIdentifier");
   QTest::addColumn<QString>("testCustomerCode");
@@ -1058,21 +454,20 @@ void GetCableType::getCableTypeByIdentifierAndCustomerCodeTest_data() {
   QString testIdentifier{ "10-al-1c-trxple" };
   QString testCustomerCode{ "bge" };
 
-  auto validResponseBody =
-      QJsonDocument::fromJson(responseBodyRaw.toUtf8()).object();
+  auto validResponseBody = QJsonDocument::fromJson(responseBodyRaw).object();
 
   QTest::newRow("Superuser valid request body 200")
       << "superuser" << testIdentifier << testCustomerCode << validResponseBody
       << 200 << QNetworkReply::NetworkError::NoError
       << test::api::MockApiServer::State::Normal;
 
-  QTest::newRow("Missing token valid request body 401")
+  QTest::newRow("Admin valid request body 401")
       << "admin" << testIdentifier << testCustomerCode
       << QJsonDocument::fromJson(R"({"cause": "Unauthorized"})").object() << 401
       << QNetworkReply::NetworkError::AuthenticationRequiredError
       << test::api::MockApiServer::State::Normal;
 
-  QTest::newRow("Missing token valid request body 401")
+  QTest::newRow("Simple user valid request body 401")
       << "user" << testIdentifier << testCustomerCode
       << QJsonDocument::fromJson(R"({"cause": "Unauthorized"})").object() << 401
       << QNetworkReply::NetworkError::AuthenticationRequiredError
@@ -1142,7 +537,7 @@ void GetCableType::getCableTypeByIdentifierAndCustomerCodeTest() {
   QFETCH(test::api::MockApiServer::State, apiState);
 
   test::api::MockApiServer apiServer{ apiState };
-  auto token = loginUser(userRole);
+  auto token = test::utils::loginUser(userRole);
 
   if (not userRole.isEmpty()) {
     QCOMPARE(155ul, token.size());
@@ -1157,7 +552,8 @@ void GetCableType::getCableTypeByIdentifierAndCustomerCodeTest() {
   }
   request.setHeader(QNetworkRequest::ContentTypeHeader,
                     QString("application/json"));
-  auto [responseObject, returnCode, networkError] = makeGetRequest(request);
+  auto [responseObject, returnCode, networkError] =
+      test::utils::makeGetRequest(request);
 
   QCOMPARE(responseObject, expectedResponseBody);
   QCOMPARE(returnCode, expectedResultCode);
@@ -1165,166 +561,6 @@ void GetCableType::getCableTypeByIdentifierAndCustomerCodeTest() {
 }
 
 void GetCableType::getCableTypeByCatIdAndCustomerCodeTest_data() {
-  auto requestBodyRaw = QString(R"(
-    {
-      "identifier": "10-al-1c-trxple",
-      "catid": 1622475,
-      "diameter": {
-        "published": {
-          "value": 22.43,
-          "unit": "mAh"
-        },
-        "actual": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "conductor": {
-        "number": 0,
-        "size": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "insulation": {
-        "type": "string",
-        "shield": "string",
-        "jacket": "string",
-        "thickness": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "material": {
-        "aluminum": 0,
-        "copper": 0,
-        "weight": {
-          "net": {
-            "value": 22.43,
-            "unit": "mAh"
-          },
-          "calculated": {
-            "value": 22.43,
-            "unit": "mAh"
-          }
-        }
-      },
-      "currentPrice": {
-        "value": 22.43,
-        "unit": "USD"
-      },
-      "voltage": {
-        "value": 22.43,
-        "unit": "mAh"
-      },
-      "rotationFrequency": {
-        "value": 22.43,
-        "unit": "m"
-      },
-      "manufacturer": {
-        "id": "5f3bc9e2502422053e08f9f1",
-        "name": "Kerite"
-      },
-      "properties": [
-        {
-          "name": "manufacturedBy",
-          "value": {
-            "string": "string value",
-            "number": 1234.56
-          }
-        }
-      ],
-      "customer": {
-        "id": "5f3bc9e2502422053e08f9f1",
-        "code": "bge"
-      },
-      "metadata": { }
-    })");
-
-  auto responseBodyRaw = QString(R"(
-    {
-      "id": "5f3bc9e2502422053e08f9f1",
-      "identifier": "10-al-1c-trxple",
-      "catid": 1622475,
-      "diameter": {
-        "published": {
-          "value": 22.43,
-          "unit": "mAh"
-        },
-        "actual": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "conductor": {
-        "number": 0,
-        "size": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "insulation": {
-        "type": "string",
-        "shield": "string",
-        "jacket": "string",
-        "thickness": {
-          "value": 22.43,
-          "unit": "mAh"
-        }
-      },
-      "material": {
-        "aluminum": 0,
-        "copper": 0,
-        "weight": {
-          "net": {
-            "value": 22.43,
-            "unit": "mAh"
-          },
-          "calculated": {
-            "value": 22.43,
-            "unit": "mAh"
-          }
-        }
-      },
-      "currentPrice": {
-        "value": 22.43,
-        "unit": "USD"
-      },
-      "voltage": {
-        "value": 22.43,
-        "unit": "mAh"
-      },
-      "rotationFrequency": {
-        "value": 22.43,
-        "unit": "m"
-      },
-      "manufacturer": {
-        "id": "5f3bc9e2502422053e08f9f1",
-        "name": "Kerite"
-      },
-      "properties": [
-        {
-          "name": "manufacturedBy",
-          "value": {
-            "string": "string value",
-            "number": 1234.56
-          }
-        }
-      ],
-      "customer": {
-        "id": "5f3bc9e2502422053e08f9f1",
-        "code": "bge"
-      },
-      "metadata": {
-        "created": "2020-10-13T21:31:51.259Z", 
-        "modified": "2020-10-13T21:31:51.259Z", 
-        "user": { 
-          "id": "5f3bc9e2502422053e08f9f1", 
-          "username": "test@reelsense.io" 
-        } 
-      }
-    })");
-
   QTest::addColumn<QString>("userRole");
   QTest::addColumn<int>("catid");
   QTest::addColumn<QString>("testCustomerCode");
@@ -1336,21 +572,20 @@ void GetCableType::getCableTypeByCatIdAndCustomerCodeTest_data() {
   int catid{ 1622475 };
   QString testCustomerCode{ "bge" };
 
-  auto validResponseBody =
-      QJsonDocument::fromJson(responseBodyRaw.toUtf8()).object();
+  auto validResponseBody = QJsonDocument::fromJson(responseBodyRaw).object();
 
   QTest::newRow("Superuser valid request body 200")
       << "superuser" << catid << testCustomerCode << validResponseBody << 200
       << QNetworkReply::NetworkError::NoError
       << test::api::MockApiServer::State::Normal;
 
-  QTest::newRow("Missing token valid request body 401")
+  QTest::newRow("Admin valid request body 401")
       << "admin" << catid << testCustomerCode
       << QJsonDocument::fromJson(R"({"cause": "Unauthorized"})").object() << 401
       << QNetworkReply::NetworkError::AuthenticationRequiredError
       << test::api::MockApiServer::State::Normal;
 
-  QTest::newRow("Missing token valid request body 401")
+  QTest::newRow("Simple user valid request body 401")
       << "user" << catid << testCustomerCode
       << QJsonDocument::fromJson(R"({"cause": "Unauthorized"})").object() << 401
       << QNetworkReply::NetworkError::AuthenticationRequiredError
@@ -1420,7 +655,7 @@ void GetCableType::getCableTypeByCatIdAndCustomerCodeTest() {
   QFETCH(test::api::MockApiServer::State, apiState);
 
   test::api::MockApiServer apiServer{ apiState };
-  auto token = loginUser(userRole);
+  auto token = test::utils::loginUser(userRole);
 
   if (not userRole.isEmpty()) {
     QCOMPARE(155ul, token.size());
@@ -1435,7 +670,8 @@ void GetCableType::getCableTypeByCatIdAndCustomerCodeTest() {
   }
   request.setHeader(QNetworkRequest::ContentTypeHeader,
                     QString("application/json"));
-  auto [responseObject, returnCode, networkError] = makeGetRequest(request);
+  auto [responseObject, returnCode, networkError] =
+      test::utils::makeGetRequest(request);
 
   QCOMPARE(responseObject, expectedResponseBody);
   QCOMPARE(returnCode, expectedResultCode);
