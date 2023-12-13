@@ -119,6 +119,90 @@ namespace {
     }
     return {};
   }
+
+  static constexpr const char defaultCableTypeData[] = R"(
+    {
+      "id": "5f3bc9e2502422053e08f9f1",
+      "identifier": "10-al-1c-trxple",
+      "catid": 1622475,
+      "diameter": {
+        "published": {
+          "value": 22.43,
+          "unit": "mAh"
+        },
+        "actual": {
+          "value": 22.43,
+          "unit": "mAh"
+        }
+      },
+      "conductor": {
+        "number": 0,
+        "size": {
+          "value": 22.43,
+          "unit": "mAh"
+        }
+      },
+      "insulation": {
+        "type": "string",
+        "shield": "string",
+        "jacket": "string",
+        "thickness": {
+          "value": 22.43,
+          "unit": "mAh"
+        }
+      },
+      "material": {
+        "aluminum": 0,
+        "copper": 0,
+        "weight": {
+          "net": {
+            "value": 22.43,
+            "unit": "mAh"
+          },
+          "calculated": {
+            "value": 22.43,
+            "unit": "mAh"
+          }
+        }
+      },
+      "currentPrice": {
+        "value": 22.43,
+        "unit": "USD"
+      },
+      "voltage": {
+        "value": 22.43,
+        "unit": "mAh"
+      },
+      "rotationFrequency": {
+        "value": 22.43,
+        "unit": "m"
+      },
+      "manufacturer": {
+        "id": "5f3bc9e2502422053e08f9f1",
+        "name": "Kerite"
+      },
+      "properties": [
+        {
+          "name": "manufacturedBy",
+          "value": {
+            "string": "string value",
+            "number": 1234.56
+          }
+        }
+      ],
+      "customer": {
+        "id": "5f3bc9e2502422053e08f9f1",
+        "code": "bge"
+      },
+      "metadata": {
+        "created": "2020-10-13T21:31:51.259Z", 
+        "modified": "2020-10-13T21:31:51.259Z", 
+        "user": { 
+          "id": "5f3bc9e2502422053e08f9f1", 
+          "username": "test@reelsense.io" 
+        } 
+      }
+    })";
 } // namespace
 
 namespace test::api {
@@ -218,9 +302,42 @@ namespace test::api {
         });
 
     m_server.route(
-        "/cable/type",
+        "/cable/type/id/<arg>",
         QHttpServerRequest::Method::Get,
-        [](const QHttpServerRequest&) -> QHttpServerResponse { return "LEL"; });
+        [state](const QString& id,
+                const QHttpServerRequest& request) -> QHttpServerResponse {
+          auto token = extractUserTokenFromHeaders(request.headers());
+          if (token.isEmpty()) {
+            return responseByState(State::Unauthorized);
+          }
+
+          if (State::Normal != state) {
+            return responseByState(state);
+          }
+
+          auto response =
+              QJsonDocument::fromJson(defaultCableTypeData).object();
+
+          auto idSize = id.size();
+          auto correctIdSize = response["id"].toString().size();
+          if (idSize < correctIdSize or idSize > correctIdSize) {
+            return QHttpServerResponse(
+                QJsonDocument::fromJson(
+                    R"({"cause": "Cable type id has invalid format"})")
+                    .object(),
+                QHttpServerResponse::StatusCode::BadRequest);
+          }
+
+          if (id != response["id"].toString()) {
+            return QHttpServerResponse(
+                QJsonDocument::fromJson(
+                    R"({"cause": "Cable type doesn't exists by specified id"})")
+                    .object(),
+                QHttpServerResponse::StatusCode::NotFound);
+          }
+
+          return response;
+        });
 
     m_server.route("/cable/type/id/<arg>",
                    QHttpServerRequest::Method::Get,
