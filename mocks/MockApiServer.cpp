@@ -392,18 +392,90 @@ namespace test::api {
           return QJsonDocument::fromJson("{}").object();
         });
 
-    m_server.route("/cable/type/id/<arg>",
-                   QHttpServerRequest::Method::Put,
-                   [](const QString& id) -> QHttpServerResponse {
-                     qDebug() << id;
-                     return "KEK";
-                   });
-    m_server.route("/cable/type/id/<arg>",
-                   QHttpServerRequest::Method::Delete,
-                   [](const QString& id) -> QHttpServerResponse {
-                     qDebug() << id;
-                     return "KEK";
-                   });
+    m_server.route(
+        "/cable/type/id/<arg>",
+        QHttpServerRequest::Method::Put,
+        [state](const QString& id,
+                const QHttpServerRequest& request) -> QHttpServerResponse {
+          auto token = extractUserTokenFromHeaders(request.headers());
+          if (token != users.at("superuser") and token != users.at("admin")) {
+            return responseByState(State::Unauthorized);
+          }
+
+          if (State::Normal != state) {
+            return responseByState(state);
+          }
+
+          QJsonObject requestBody =
+              QJsonDocument::fromJson(request.body()).object();
+
+          if (not requestBody.contains("id")) {
+            return QHttpServerResponse(
+                QJsonDocument::fromJson(
+                    R"({"cause": "id not provided in request"})")
+                    .object(),
+                QHttpServerResponse::StatusCode::BadRequest);
+          }
+
+          if (id != requestBody["id"].toString()) {
+            return QHttpServerResponse(
+                QJsonDocument::fromJson(
+                    R"({"cause": "id mismatch for URL and request body"})")
+                    .object(),
+                QHttpServerResponse::StatusCode::BadRequest);
+          }
+
+          if (not requestBody.contains("catid") or
+              not requestBody.contains("identifier")) {
+            return QHttpServerResponse(
+                QJsonDocument::fromJson(R"({"cause": "missing required keys"})")
+                    .object(),
+                QHttpServerResponse::StatusCode::BadRequest);
+          }
+
+          QJsonObject defaultCableType =
+              QJsonDocument::fromJson(defaultCableTypeData).object();
+
+          if (defaultCableType["id"] != requestBody["id"] or
+              defaultCableType["catid"] != requestBody["catid"] or
+              defaultCableType["identifier"] != requestBody["identifier"]) {
+            return QHttpServerResponse(
+                QJsonDocument::fromJson(
+                    R"({"cause": "Attempt to change immutable keys"})")
+                    .object(),
+                QHttpServerResponse::StatusCode::PreconditionFailed);
+          }
+
+          if (requestBody.contains("rotationFrequency") and
+              (not requestBody["rotationFrequency"].isObject() or
+               not requestBody["rotationFrequency"].toObject().contains(
+                   "unit"))) {
+            return QHttpServerResponse(
+                QJsonDocument::fromJson(
+                    R"({"cause": "rotationFrequency invalid specification"})")
+                    .object(),
+                QHttpServerResponse::StatusCode::BadRequest);
+          }
+
+          if (requestBody.contains("rotationFrequency") and
+              std::none_of(rotationFrequencyUnitValues.begin(),
+                           rotationFrequencyUnitValues.end(),
+                           [&requestBody](const auto& value) -> bool {
+                             return value == requestBody["rotationFrequency"]
+                                                 .toObject()["unit"]
+                                                 .toString()
+                                                 .toStdString();
+                           })) {
+            return QHttpServerResponse(
+                QJsonDocument::fromJson(
+                    R"({"cause": "rotationFrequency.unit has invalid value"})")
+                    .object(),
+                QHttpServerResponse::StatusCode::BadRequest);
+          }
+
+          return requestBody;
+        });
+
     m_server.route("/cable/type/identifier/<arg>",
                    QHttpServerRequest::Method::Get,
                    [](const QString& identifier) -> QHttpServerResponse {
