@@ -426,12 +426,32 @@ namespace test::api {
           return requestBody;
         });
 
-    m_server.route("/cable/type/identifier/<arg>",
-                   QHttpServerRequest::Method::Get,
-                   [](const QString& identifier) -> QHttpServerResponse {
-                     qDebug() << identifier;
-                     return "KEK";
-                   });
+    m_server.route(
+        "/cable/type/identifier/<arg>",
+        QHttpServerRequest::Method::Get,
+        [state](const QString& identifier,
+                const QHttpServerRequest& request) -> QHttpServerResponse {
+          auto token = extractUserTokenFromHeaders(request.headers());
+          if (token.isEmpty()) {
+            return responseByState(State::Unauthorized);
+          }
+
+          if (State::Normal != state) {
+            return responseByState(state);
+          }
+
+          QJsonObject defaultCableType =
+              QJsonDocument::fromJson(defaultCableTypeData).object();
+
+          if (identifier != defaultCableType["id"].toString()) {
+            return makeResponse(
+                R"({"cause": "Cable type not found by identifier"})",
+                QHttpServerResponse::StatusCode::NotFound);
+          }
+
+          return defaultCableType;
+        });
+
     m_server.route("/cable/type/customer/code/<arg>",
                    QHttpServerRequest::Method::Get,
                    [](const QString& code) -> QHttpServerResponse {
