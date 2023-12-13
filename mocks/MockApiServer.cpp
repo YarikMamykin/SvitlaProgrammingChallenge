@@ -345,6 +345,53 @@ namespace test::api {
                      qDebug() << id;
                      return "KEK";
                    });
+    m_server.route(
+        "/cable/type/id/<arg>",
+        QHttpServerRequest::Method::Delete,
+        [state](const QString& id,
+                const QHttpServerRequest& request) -> QHttpServerResponse {
+          auto token = extractUserTokenFromHeaders(request.headers());
+          if (token.isEmpty() or
+              (token != users.at("superuser") and token != users.at("admin"))) {
+            return responseByState(State::Unauthorized);
+          }
+
+          if (State::CableTypeReferencedByOtherEntities == state) {
+            return QHttpServerResponse(
+                QJsonDocument::fromJson(
+                    R"({"cause": "Cable type is referenced by other entities"})")
+                    .object(),
+                QHttpServerResponse::StatusCode::PreconditionFailed);
+          }
+
+          if (State::Normal != state) {
+            return responseByState(state);
+          }
+
+          auto response =
+              QJsonDocument::fromJson(defaultCableTypeData).object();
+
+          auto idSize = id.size();
+          auto correctIdSize = response["id"].toString().size();
+          if (idSize < correctIdSize or idSize > correctIdSize) {
+            return QHttpServerResponse(
+                QJsonDocument::fromJson(
+                    R"({"cause": "Cable type id has invalid format"})")
+                    .object(),
+                QHttpServerResponse::StatusCode::BadRequest);
+          }
+
+          if (id != response["id"].toString()) {
+            return QHttpServerResponse(
+                QJsonDocument::fromJson(
+                    R"({"cause": "Cable type doesn't exists by specified id"})")
+                    .object(),
+                QHttpServerResponse::StatusCode::NotFound);
+          }
+
+          return QJsonDocument::fromJson("{}").object();
+        });
+
     m_server.route("/cable/type/id/<arg>",
                    QHttpServerRequest::Method::Put,
                    [](const QString& id) -> QHttpServerResponse {
