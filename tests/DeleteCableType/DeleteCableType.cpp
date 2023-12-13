@@ -3,61 +3,10 @@
 #include <QJsonObject>
 #include <QObject>
 #include <QTest>
+#include <utils.h>
 
 class DeleteCableType : public QObject {
   Q_OBJECT
-
-private:
-  std::tuple<QJsonObject, int, QNetworkReply::NetworkError>
-  makeDeleteRequest(const QNetworkRequest& request) {
-
-    QNetworkAccessManager manager;
-
-    QNetworkReply* reply = manager.deleteResource(request);
-
-    // Set up a QEventLoop to wait for the reply finished signal
-    QEventLoop loop;
-    connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-
-    loop.exec();
-
-    auto replyBytes = reply->readAll();
-    QJsonDocument replyData = QJsonDocument::fromJson(replyBytes);
-    auto result = std::make_tuple(
-        replyData.object(),
-        reply->attribute(QNetworkRequest::Attribute::HttpStatusCodeAttribute)
-            .toInt(),
-        reply->error());
-
-    // Clean up
-    reply->deleteLater();
-
-    return result;
-  }
-
-  QString loginUser(const QString& userRole) {
-    QNetworkAccessManager manager;
-
-    QNetworkRequest request(
-        QUrl(QString("http://localhost:8080/login/%1").arg(userRole)));
-    request.setHeader(QNetworkRequest::ContentTypeHeader,
-                      QString("application/json"));
-    QNetworkReply* reply = manager.get(request);
-
-    // Set up a QEventLoop to wait for the reply finished signal
-    QEventLoop loop;
-    connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-
-    loop.exec();
-
-    auto replyBytes = reply->readAll();
-    QJsonDocument response = QJsonDocument::fromJson(replyBytes);
-    auto token = response.object()["jwtToken"].toString();
-
-    // Clean up
-    reply->deleteLater();
-    return token;
-  }
 
 private slots:
   void deleteCableTypeTest_data();
@@ -169,7 +118,7 @@ void DeleteCableType::deleteCableTypeTest() {
   QFETCH(test::api::MockApiServer::State, apiState);
 
   test::api::MockApiServer apiServer{ apiState };
-  auto token = loginUser(userRole);
+  auto token = test::utils::loginUser(userRole);
 
   if (not userRole.isEmpty()) {
     QCOMPARE(155ul, token.size());
@@ -182,7 +131,8 @@ void DeleteCableType::deleteCableTypeTest() {
   }
   request.setHeader(QNetworkRequest::ContentTypeHeader,
                     QString("application/json"));
-  auto [responseObject, returnCode, networkError] = makeDeleteRequest(request);
+  auto [responseObject, returnCode, networkError] =
+      test::utils::makeDeleteRequest(request);
 
   QCOMPARE(responseObject, expectedResponseBody);
   QCOMPARE(returnCode, expectedResultCode);
