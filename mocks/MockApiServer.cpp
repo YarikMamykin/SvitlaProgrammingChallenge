@@ -443,7 +443,7 @@ namespace test::api {
           QJsonObject defaultCableType =
               QJsonDocument::fromJson(defaultCableTypeData).object();
 
-          if (identifier != defaultCableType["id"].toString()) {
+          if (identifier != defaultCableType["identifier"].toString()) {
             return makeResponse(
                 R"({"cause": "Cable type not found by identifier"})",
                 QHttpServerResponse::StatusCode::NotFound);
