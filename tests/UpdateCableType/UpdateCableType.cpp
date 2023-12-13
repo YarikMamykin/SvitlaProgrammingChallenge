@@ -3,69 +3,18 @@
 #include <QJsonObject>
 #include <QObject>
 #include <QTest>
+#include <utils.h>
 
 class UpdateCableType : public QObject {
   Q_OBJECT
-
-private:
-  std::tuple<QJsonObject, int, QNetworkReply::NetworkError>
-  makePutRequest(const QNetworkRequest& request, const QByteArray& data) {
-
-    QNetworkAccessManager manager;
-
-    QNetworkReply* reply = manager.put(request, data);
-
-    // Set up a QEventLoop to wait for the reply finished signal
-    QEventLoop loop;
-    connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-
-    loop.exec();
-
-    auto replyBytes = reply->readAll();
-    QJsonDocument replyData = QJsonDocument::fromJson(replyBytes);
-    auto result = std::make_tuple(
-        replyData.object(),
-        reply->attribute(QNetworkRequest::Attribute::HttpStatusCodeAttribute)
-            .toInt(),
-        reply->error());
-
-    // Clean up
-    reply->deleteLater();
-
-    return result;
-  }
-
-  QString loginUser(const QString& userRole) {
-    QNetworkAccessManager manager;
-
-    QNetworkRequest request(
-        QUrl(QString("http://localhost:8080/login/%1").arg(userRole)));
-    request.setHeader(QNetworkRequest::ContentTypeHeader,
-                      QString("application/json"));
-    QNetworkReply* reply = manager.get(request);
-
-    // Set up a QEventLoop to wait for the reply finished signal
-    QEventLoop loop;
-    connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-
-    loop.exec();
-
-    auto replyBytes = reply->readAll();
-    QJsonDocument response = QJsonDocument::fromJson(replyBytes);
-    auto token = response.object()["jwtToken"].toString();
-
-    // Clean up
-    reply->deleteLater();
-    return token;
-  }
 
 private slots:
   void updateCableTypeTest_data();
   void updateCableTypeTest();
 };
 
-void UpdateCableType::updateCableTypeTest_data() {
-  auto requestBodyRaw = QString(R"(
+namespace {
+  static constexpr char requestBodyRaw[] = R"(
     {
       "id": "5f3bc9e2502422053e08f9f1",
       "identifier": "10-al-1c-trxple",
@@ -140,7 +89,10 @@ void UpdateCableType::updateCableTypeTest_data() {
         "code": "bge"
       },
       "metadata": { }
-    })");
+  })";
+}
+
+void UpdateCableType::updateCableTypeTest_data() {
 
   QTest::addColumn<QString>("userRole");
   QTest::addColumn<QJsonObject>("requestBody");
@@ -153,10 +105,8 @@ void UpdateCableType::updateCableTypeTest_data() {
   /*
    * API Mock simply sends back request body if it fits requirements.
    */
-  auto validRequestBody =
-      QJsonDocument::fromJson(requestBodyRaw.toUtf8()).object();
-  auto validResponseBody =
-      QJsonDocument::fromJson(requestBodyRaw.toUtf8()).object();
+  auto validRequestBody = QJsonDocument::fromJson(requestBodyRaw).object();
+  auto validResponseBody = QJsonDocument::fromJson(requestBodyRaw).object();
 
   QString testId{ "5f3bc9e2502422053e08f9f1" };
 
@@ -293,7 +243,7 @@ void UpdateCableType::updateCableTypeTest() {
   QFETCH(QString, testId);
 
   test::api::MockApiServer apiServer{ apiState };
-  auto token = loginUser(userRole);
+  auto token = test::utils::loginUser(userRole);
 
   if (not userRole.isEmpty()) {
     QCOMPARE(155ul, token.size());
@@ -307,7 +257,7 @@ void UpdateCableType::updateCableTypeTest() {
   request.setHeader(QNetworkRequest::ContentTypeHeader,
                     QString("application/json"));
   auto [responseObject, returnCode, networkError] =
-      makePutRequest(request, QJsonDocument(requestBody).toJson());
+      test::utils::makePutRequest(request, QJsonDocument(requestBody).toJson());
 
   QCOMPARE(responseObject, expectedResponseBody);
   QCOMPARE(returnCode, expectedResultCode);
