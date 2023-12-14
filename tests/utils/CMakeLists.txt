@@ -1,0 +1,22 @@
+add_library(utils
+	OBJECT
+	${CMAKE_CURRENT_SOURCE_DIR}/utils.cpp
+)
+target_compile_options(utils
+	PUBLIC
+	-fPIC 
+	-Wall 
+	-Werror
+	-Wextra
+	-Wpedantic
+)
+target_include_directories(utils
+	PUBLIC
+	${Qt6Core_INCLUDE_DIRS}
+)
+target_link_libraries(utils
+	PUBLIC
+	Qt6::Core
+	Qt6::HttpServer
+)
+

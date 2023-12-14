@@ -9,9 +9,11 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
 
-include(${CMAKE_SOURCE_DIR}/dependencies/qt.cmake)
-
 project(SvitlaProgrammingChallenge VERSION 0.1.0 LANGUAGES CXX)
 
-add_subdirectory(src)
+include(${CMAKE_SOURCE_DIR}/dependencies/qt.cmake)
+
+add_subdirectory(mocks)
 add_subdirectory(tests)
+
+install(FILES ${CMAKE_BINARY_DIR}/compile_commands.json DESTINATION ${CMAKE_SOURCE_DIR})
