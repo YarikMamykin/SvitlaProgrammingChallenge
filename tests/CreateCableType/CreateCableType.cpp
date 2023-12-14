@@ -187,19 +187,22 @@ void CreateCableType::createCableTypeTest_data() {
   auto validRequestBody = QJsonDocument::fromJson(requestBodyRaw).object();
   auto validResponseBody = QJsonDocument::fromJson(responseBodyRaw).object();
 
-  QTest::newRow("Superuser valid request body 200")
+  QTest::newRow("Superuser makes valid request, created cable type object "
+                "returned in response and response code 200")
       << "superuser" << validRequestBody << validResponseBody << 200
       << QNetworkReply::NetworkError::NoError
       << test::api::MockApiServer::State::Normal;
 
-  QTest::newRow("Admin valid request body 200")
+  QTest::newRow("Admin makes valid request, created cable type object returned "
+                "in response and response code 200")
       << "admin" << validRequestBody << validResponseBody << 200
       << QNetworkReply::NetworkError::NoError
       << test::api::MockApiServer::State::Normal;
 
   auto requestBodyWithId = validRequestBody;
   requestBodyWithId["id"] = "5f3bc9e2502422053e08f9f1";
-  QTest::newRow("ID present in request 400")
+  QTest::newRow(
+      "ID present in request, error message with response code 400 returned")
       << "admin" << requestBodyWithId
       << QJsonDocument::fromJson(R"({"cause": "id provided in request"})")
              .object()
@@ -213,7 +216,8 @@ void CreateCableType::createCableTypeTest_data() {
   rotationFrequencyObject["unit"] = "g";
   requestBodyWithInvalidRotationFrequencyUnit["rotationFrequency"] =
       rotationFrequencyObject;
-  QTest::newRow("Rotation frequency unit value is invalid 400")
+  QTest::newRow("Rotation frequency unit value is invalid, error message with "
+                "response code 400 returned")
       << "admin" << requestBodyWithInvalidRotationFrequencyUnit
       << QJsonDocument::fromJson(
              R"({"cause": "rotationFrequency.unit has invalid value"})")
@@ -224,26 +228,30 @@ void CreateCableType::createCableTypeTest_data() {
   auto requestBodyWithoutRequiredKeys = validRequestBody;
   requestBodyWithoutRequiredKeys.remove("identifier");
   requestBodyWithoutRequiredKeys.remove("catid");
-  QTest::newRow("Request without required keys 400")
+  QTest::newRow("Request without required keys, error message with response "
+                "code 400 returned")
       << "admin" << requestBodyWithoutRequiredKeys
       << QJsonDocument::fromJson(R"({"cause": "missing required keys"})")
              .object()
       << 400 << QNetworkReply::NetworkError::ProtocolInvalidOperationError
       << test::api::MockApiServer::State::Normal;
 
-  QTest::newRow("User valid request body 401")
+  QTest::newRow("User makes valid request, error message with response code "
+                "401 returned (no permissions)")
       << "user" << validRequestBody
       << QJsonDocument::fromJson(R"({"cause": "Unauthorized"})").object() << 401
       << QNetworkReply::NetworkError::AuthenticationRequiredError
       << test::api::MockApiServer::State::Normal;
 
-  QTest::newRow("Missing token valid request body 401")
+  QTest::newRow("No token provided in request, error message with response "
+                "code 401 returned (no permissions)")
       << "" << validRequestBody
       << QJsonDocument::fromJson(R"({"cause": "Unauthorized"})").object() << 401
       << QNetworkReply::NetworkError::AuthenticationRequiredError
       << test::api::MockApiServer::State::Normal;
 
-  QTest::newRow("Mismatch of customer and user ids 403")
+  QTest::newRow("Request with mismatch of customer and user ids, error message "
+                "with response code 403 returned")
       << "admin" << validRequestBody
       << QJsonDocument::fromJson(
              R"({"cause": "Attempt to access another customer data"})")
@@ -251,7 +259,8 @@ void CreateCableType::createCableTypeTest_data() {
       << 403 << QNetworkReply::NetworkError::ContentAccessDenied
       << test::api::MockApiServer::State::AttemptToAccessAnotherCustomerData;
 
-  QTest::newRow("Customer by id doesn't exist 404")
+  QTest::newRow("Request with non existing customer id, error message with "
+                "response code 404 returned")
       << "admin" << validRequestBody
       << QJsonDocument::fromJson(
              R"({"cause": "Non existing customer id specified"})")
@@ -259,21 +268,24 @@ void CreateCableType::createCableTypeTest_data() {
       << 404 << QNetworkReply::NetworkError::ContentNotFoundError
       << test::api::MockApiServer::State::NonExistingCustomerId;
 
-  QTest::newRow("Customer by id doesn't exist 409")
+  QTest::newRow("Request sent with already existing cable type, error message "
+                "with response code 409 returned")
       << "admin" << validRequestBody
       << QJsonDocument::fromJson(R"({"cause": "Cable type already exists"})")
              .object()
       << 409 << QNetworkReply::NetworkError::ContentConflictError
       << test::api::MockApiServer::State::CableTypeAlreadyExists;
 
-  QTest::newRow("Business rules violated 412")
+  QTest::newRow("Request sent with business rules violated, error message with "
+                "response code 412 returned")
       << "admin" << validRequestBody
       << QJsonDocument::fromJson(R"({"cause": "Business rules violated"})")
              .object()
       << 412 << QNetworkReply::NetworkError::UnknownContentError
       << test::api::MockApiServer::State::BusinessRulesViolated;
 
-  QTest::newRow("Database rejected transaction 417")
+  QTest::newRow("Database rejected transaction, error message with response "
+                "code 417 returned")
       << "admin" << validRequestBody
       << QJsonDocument::fromJson(
              R"({"cause": "Database rejected transaction"})")
@@ -281,28 +293,32 @@ void CreateCableType::createCableTypeTest_data() {
       << 417 << QNetworkReply::NetworkError::UnknownContentError
       << test::api::MockApiServer::State::DatabaseRejectedTransaction;
 
-  QTest::newRow("Database unhandled error 422")
+  QTest::newRow(
+      "Database unhandled error, error message with response code 422 returned")
       << "admin" << validRequestBody
       << QJsonDocument::fromJson(R"({"cause": "Database unhandled error"})")
              .object()
       << 422 << QNetworkReply::NetworkError::UnknownContentError
       << test::api::MockApiServer::State::DatabaseUnhandledError;
 
-  QTest::newRow("Database request timeout 424")
+  QTest::newRow(
+      "Database request timeout, error message with response code 424 returned")
       << "admin" << validRequestBody
       << QJsonDocument::fromJson(R"({"cause": "Database request timeout"})")
              .object()
       << 424 << QNetworkReply::NetworkError::UnknownContentError
       << test::api::MockApiServer::State::DatabaseRequestTimeout;
 
-  QTest::newRow("Database request timeout 500")
+  QTest::newRow("Database connection error, error message with response code "
+                "500 returned")
       << "admin" << validRequestBody
       << QJsonDocument::fromJson(R"({"cause": "Database connection error"})")
              .object()
       << 500 << QNetworkReply::NetworkError::InternalServerError
       << test::api::MockApiServer::State::DatabaseConnectionError;
 
-  QTest::newRow("Database request timeout 507")
+  QTest::newRow(
+      "Too large payload, error message with response code 507 returned")
       << "admin" << validRequestBody
       << QJsonDocument::fromJson(R"({"cause": "Too large payload"})").object()
       << 507 << QNetworkReply::NetworkError::UnknownServerError
